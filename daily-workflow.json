@@ -1,0 +1,79 @@
+{
+  "id": "DailyVerticalClip01",
+  "name": "Daily Vertical Clips - VPS",
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Kolkata"
+  },
+  "nodes": [
+    {
+      "id": "92afb477-eeff-4d46-b36e-a296e6449232",
+      "name": "Daily at 5 PM IST",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 17 * * *"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "719bdce2-e177-4547-9eaf-ab3147085570",
+      "name": "Manual Run",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        200
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "8c73f1b8-e426-4f0e-a38f-7cb9d064163b",
+      "name": "Generate and Publish Clips",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        300,
+        90
+      ],
+      "parameters": {
+        "command": "python3 /opt/clips/clips.py --slot evening"
+      }
+    }
+  ],
+  "connections": {
+    "Manual Run": {
+      "main": [
+        [
+          {
+            "node": "Generate and Publish Clips",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Daily at 5 PM IST": {
+      "main": [
+        [
+          {
+            "node": "Generate and Publish Clips",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

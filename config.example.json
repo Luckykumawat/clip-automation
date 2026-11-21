@@ -1,0 +1,14 @@
+{
+  "channel_streams_urls": [
+    "https://www.youtube.com/@IShowSpeed/streams",
+    "https://www.youtube.com/@CarryisLive/streams",
+    "https://www.youtube.com/@Mythpat/streams"
+  ],
+  "ishowspeed_facecam": false,
+  "auto_publish": false,
+  "youtube_privacy": "public",
+  "meta_graph_version": "v27.0",
+  "instagram_provider": "buffer",
+  "instagram_handle": "@YOUR_INSTAGRAM_HANDLE",
+  "one_clip_per_creator": true
+}
