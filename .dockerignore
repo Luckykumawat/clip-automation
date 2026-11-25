@@ -5,3 +5,4 @@
 !daily-workflow.json
 !entrypoint.sh
 !Dockerfile
+!clip_metadata.py

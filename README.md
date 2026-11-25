@@ -1,6 +1,6 @@
 # Gaming clip automation on a VPS
 
-This package ports the existing clip worker to Linux with Docker Compose. The scheduler starts one run daily at 17:00 Asia/Kolkata. Each run targets one new clip per configured creator, up to three clips. The worker targets 45 seconds, validates a 40–50 second duration, and exports 1080 × 1920 MP4s. Uploads can finish after 17:00 because fetching, rendering, and platform processing take time.
+This package ports the existing clip worker to Linux with Docker Compose. The n8n workflow starts twice daily at 08:45 and 16:45 Asia/Kolkata. Each slot targets up to three 45-second vertical clips at 1080 × 1920. Posting and platform verification can finish after the trigger time.
 
 ## Requirements
 
@@ -13,7 +13,7 @@ This project uses its own service and data directory. The dashboard maps to a lo
 
 ## Unpack and configure
 
-Transfer this ZIP over SSH, extract it into its own directory, and run the following commands from the extracted `clip-automation-vps` directory. These commands assume a root deployment shell. The worker container runs as UID/GID 1000, so the container must be able to read its configuration and write its data.
+Clone the repository on the VPS and run the following commands from its deployment directory. The maintenance scripts expect the VPS checkout at `/opt/clip-automation-vps`. These commands assume a root deployment shell. The worker container runs as UID/GID 1000, so the container must be able to read its configuration and write its data.
 
 ```sh
 docker --version
@@ -79,7 +79,87 @@ Useful commands and references
 ## Storage and failures
 
 - `data/n8n` holds the scheduler's SQLite database and execution history. `data/state` holds queue records, source windows, publication IDs, and the private credentials file. A standalone database server is unnecessary.
-- `data/exports` holds finished MP4s, and temporary render samples are normally cleaned up after the run. Cloudinary hosts a copy for Buffer delivery. At 20–40 MB per clip and three clips per day, seven days of exports are roughly 420–840 MB, separate from Docker images, logs, and scratch space.
+- `data/exports` holds finished MP4s, and temporary render samples are normally cleaned up after the run. Cloudinary hosts a copy for Buffer delivery. At 20–40 MB per clip and six clips per day, seven days of exports are roughly 840–1,680 MB, separate from Docker images, logs, and scratch space.
 - Automatic retention is not configured. After verifying both posts, apply your retention policy to finished MP4s and hosted assets. Preserve queue records and keep pending uploads' files until you resolve them.
 - If the image build fails, check server architecture, outbound registry access, disk space, and the pinned dependencies. If downloads fail, verify the current yt-dlp release and JS runtime, and check for accessible completed replays. If OAuth returns an authorization error, renew the refresh token. If Buffer is pending, check its delivery status before retrying. If the dashboard port is busy, change the host port in `.env` and recreate the service.
 - A same-day retry of the same slot uses saved state and skips platforms with recorded post IDs. Reconcile an ambiguous upload in YouTube Studio or Buffer before retrying. The worker uses the current IST date, so running it tomorrow does not replay today's slot.
+
+## Clip-specific titles and captions
+
+Set `gemini_api_key` in `data/state/credentials.json` (mode 600) and enable
+`content_aware_clips` in `data/config.json`. This sends compressed candidate
+footage and audio to Google's Gemini API. The worker rejects weak candidates
+and ranks the rest by the opening hook, clarity, and payoff. It saves separate
+YouTube and Instagram copy. Older queued clips with generic copy are held
+when this feature is enabled.
+
+Rebuild the worker with `docker compose up -d --build` from the deployment
+directory. To preview generated copy without publishing, run `clips.py --test`
+with a local clip in the container. The preview uses the same video analysis
+and writes only to the test directory.
+
+
+## Source and publishing modes
+
+- Set `channel_streams_urls` to creator Live tabs and optionally add individual
+  YouTube watch links to `youtube_video_urls`. An individual URL gets priority
+  until its first clip is queued. Creator feeds can then fill unused slots.
+- For YouTube sources, the worker uses the cookie file at
+  `data/youtube-auth/youtube-cookies.txt` when it exists. Keep it private and
+  readable by the worker. The bind-mounted file survives container rebuilds.
+  Refresh it when YouTube rejects the session.
+- Use `instagram_only: true` to publish Instagram Reels from authorized files
+  in `data/recordings` without fetching YouTube sources. In dual-platform mode,
+  Instagram publishing is attempted first, and its saved result survives a
+  YouTube publishing error.
+- Progress is written to `data/state/clip-progress.log`. Configure
+  `telegram_bot_token` and `telegram_chat_id` for publication and failure alerts.
+
+## Telegram Drive scheduling
+
+Run the following from the local checkout after setting the VPS SSH login.
+The first installer prompts privately for a Google Drive API key if needed.
+The second installer enables the scheduled Drive intake and updates the running
+clip worker without recreating its container.
+
+```sh
+export CLIPS_SSH_HOST="root@YOUR_VPS"
+bash tools/install-telegram-drive.sh
+bash tools/install-scheduled-drive.sh
+```
+
+Send `/status` in the configured private bot chat to verify it responds.
+Submit each downloadable Drive file with `/clip <Drive file link>`. The next
+08:45 or 16:45 IST slot takes up to three distinct scheduled Drive sources,
+one clip per source. Each source saves its next timestamp and continues in
+subsequent slots until less than 45 seconds of usable footage remains.
+The bot reports progress, platform links, and when a new source is needed.
+Use `/now <Drive file link>` for an immediate one-off publishing request.
+
+Use footage you have permission to repost. With API-key access the Drive
+file must be downloadable by anyone with its link. Intake is capped at
+20 GB and may be lower based on available disk space. Use `/status` to
+check held jobs before submitting the same file again. The separate,
+optional Telegram creator-selection setting should stay disabled when
+the Drive listener uses the same bot token.
+
+## Mac commands and troubleshooting
+
+Open the [offline HTML guide](clip-workflow-guide.html) locally for copyable
+commands, Drive sharing steps, and the full publishing checklist.
+Run its commands from the repository root. Set `CLIPS_HISTORY_DIR` if old
+local timestamp records are stored outside this checkout.
+
+```sh
+bash tools/cut-three-to-desktop.sh
+bash tools/clip-cookie-refresh.sh refresh
+```
+
+The first command exports cuts from sources absent in the available upload
+records. The refresh command tests a fresh `~/Downloads/youtube-cookies.txt`
+before replacing the scheduled cookie file. Use `morning` or `evening` in
+place of `refresh` to retry that slot on the current IST date.
+
+This repository contains source, templates, and maintenance tools. Keep
+credentials, cookie files, production data, and rendered media on the VPS
+or in their private local locations.

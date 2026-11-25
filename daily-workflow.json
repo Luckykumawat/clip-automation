@@ -8,8 +8,41 @@
   },
   "nodes": [
     {
+      "id": "b39f6a9d-1ca3-4e9e-99ab-062c94017790",
+      "name": "Morning 8:45 AM IST",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        -200
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "45 8 * * *"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "da3e3d7d-244d-4ea0-ae75-76211324502c",
+      "name": "Generate and Publish Morning Clips",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        300,
+        -200
+      ],
+      "parameters": {
+        "command": "python3 -u /opt/clips/clips.py --slot morning"
+      }
+    },
+    {
       "id": "92afb477-eeff-4d46-b36e-a296e6449232",
-      "name": "Daily at 5 PM IST",
+      "name": "Afternoon 4:45 PM IST",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
       "position": [
@@ -21,7 +54,7 @@
           "interval": [
             {
               "field": "cronExpression",
-              "expression": "0 17 * * *"
+              "expression": "45 16 * * *"
             }
           ]
         }
@@ -48,7 +81,7 @@
         90
       ],
       "parameters": {
-        "command": "python3 /opt/clips/clips.py --slot evening"
+        "command": "if [ \"$(TZ=Asia/Kolkata date +%H:%M)\" = \"16:45\" ]; then exec python3 -u /opt/clips/clips.py --slot evening; fi\necho \"Evening scheduled command skipped outside 16:45 IST.\""
       }
     }
   ],
@@ -64,7 +97,18 @@
         ]
       ]
     },
-    "Daily at 5 PM IST": {
+    "Morning 8:45 AM IST": {
+      "main": [
+        [
+          {
+            "node": "Generate and Publish Morning Clips",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Afternoon 4:45 PM IST": {
       "main": [
         [
           {

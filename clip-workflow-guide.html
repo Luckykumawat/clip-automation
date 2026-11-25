@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="hi-Latn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Clip Automation Guide — Mac, Drive &amp; Telegram</title>
+<style>
+:root{color-scheme:light;--ink:#152421;--muted:#4c625c;--paper:#f4f7f2;--accent:#13664f;--line:#d6e3da}
+*{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.65 system-ui,sans-serif}
+header{background:#10372e;color:#fff;padding:50px max(22px,calc((100vw - 920px)/2));padding-bottom:34px}
+h1{font-size:clamp(2rem,6vw,3.3rem);line-height:1.13;margin:0 0 12px}header p{margin:0;color:#d4f0e6}
+main{width:min(920px,calc(100% - 36px));margin:25px auto 60px}nav{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:24px}
+nav a{border:1px solid var(--line);border-radius:30px;padding:5px 14px;background:white;text-decoration:none}
+a{color:var(--accent)}section{background:white;border:1px solid var(--line);border-radius:14px;padding:clamp(17px,4vw,30px);margin:0 0 20px}
+h2{line-height:1.25;margin:0 0 12px}h3{margin:20px 0 5px}p{margin:8px 0 12px}li+li{margin-top:7px}
+pre{white-space:pre-wrap;overflow-wrap:anywhere;margin:0;background:#122b24;color:#fff;padding:14px 16px;border-radius:0 0 9px 9px}
+code{font-family:ui-monospace,monospace;font-size:.91em}p code,li code,td code{background:#e9f1eb;border-radius:4px;padding:1px 4px}
+.command{margin:13px 0 18px}.command-bar{display:flex;gap:10px;align-items:center;justify-content:space-between;background:#dbede4;border-radius:9px 9px 0 0;padding:6px 10px;color:#143d30;font-size:.88rem}
+button{cursor:pointer;font:inherit;font-weight:650;background:#fff;color:#164c3b;border:1px solid #96baa9;border-radius:6px;padding:4px 11px;min-width:67px}button:focus-visible,a:focus-visible{outline:3px solid #f19329;outline-offset:3px}
+.note{border-left:4px solid var(--accent);background:#edf7f0;padding:9px 13px;margin:12px 0}.warn{border-left-color:#9a550f;background:#fff4e6}
+table{width:100%;border-collapse:collapse}th,td{padding:10px 12px;text-align:left;vertical-align:top;border-bottom:1px solid var(--line)}th{background:#eaf2ec}td:first-child{width:34%}
+footer{color:var(--muted);font-size:.9rem} @media print{button,nav{display:none}section{break-inside:avoid}}
+</style>
+</head>
+<body>
+<header><h1>Clip automation guide</h1><p>CarryMinati, IShowSpeed aur Mythpat ke 5-minute source cuts se daily YouTube Shorts aur Instagram Reels tak.</p></header>
+<main>
+<p class="note">Mac Terminal mein pehle repo folder kholo aur apna VPS set karo. Purane local records bhi check karne ke liye <code>CLIPS_HISTORY_DIR</code> ko us root folder par set karo jisme <code>outputs/</code> aur <code>work/</code> hain.</p><div class="command"><div class="command-bar"><span>Mac Terminal · apna VPS address lagao</span><button type="button">Copy</button></div><pre><code>export CLIPS_SSH_HOST="root@YOUR_VPS"</code></pre></div>
+<nav aria-label="Guide sections"><a href="#desktop">Desktop cuts</a><a href="#install">VPS setup</a><a href="#drive">Drive aur Telegram</a><a href="#verify">Completion check</a><a href="#problems">Common problems</a><a href="#cookies">Cookie recovery</a></nav>
+
+<section id="desktop">
+<h2>1. Teeno creators ke 5-minute cuts Desktop par banao</h2>
+<p><strong>Mac Terminal</strong> kholo. Copy button se command copy karo, paste karo aur Enter dabao. VPS password maange toh Terminal mein enter karo. Password type karte waqt screen blank reh sakti hai.</p>
+<div class="command"><div class="command-bar"><span>Mac Terminal</span><button type="button">Copy</button></div><pre><code>bash "tools/cut-three-to-desktop.sh"</code></pre></div>
+<ol>
+<li>Process finish hone tak Terminal khuli rakho. Ye command koi post publish nahi karti.</li>
+<li><code>Files saved in ...</code> ke baad Finder → Desktop mein <code>Three-creator-cuts.…</code> folder kholo.</li>
+<li>CarryMinati (CarryisLive), IShowSpeed aur Mythpat ki teen MP4 files dekho. Terminal mein har cut ka source link aur timestamp milega.</li>
+</ol>
+<p class="note">Script VPS queue aur local timestamp records mein pehle use hui source video skip karti hai. In records ke bahar ki manual posts verify nahi hoti. <code>Missing:</code> aaye toh us creator ki file nahi bani.</p>
+</section>
+
+<section id="install">
+<h2>2. Scheduled Drive update ek baar VPS par install karo</h2>
+<p>Agar latest update ke liye <code>Scheduled Drive queue enabled</code> already mila hai, step 3 par jao. Warna Mac Terminal mein installer chalao. Ye active clip run ka wait karega. Installer khud koi post trigger nahi karta.</p>
+<div class="command"><div class="command-bar"><span>Mac Terminal</span><button type="button">Copy</button></div><pre><code>bash "tools/install-scheduled-drive.sh"</code></pre></div>
+<p><code>active</code> aur <code>Scheduled Drive queue enabled</code> aaye toh bot ki private chat mein <code>/status</code> bhejo. Reply milne par aage badho.</p>
+<p class="warn"><strong>Purana bot version:</strong> Usmein <code>/clip</code> turant job start kar sakta hai. Scheduled confirmation milne ke baad hi teen links bhejo.</p>
+</section>
+
+<section id="drive">
+<h2>3. Drive par upload karo aur Telegram se queue karo</h2>
+<ol>
+<li>Teeno MP4 files Google Drive par upload karo. Footage wahi use karo jise clip aur repost karne ki tumhare paas permission ho.</li>
+<li>Har file par <strong>Share → General access → Anyone with the link → Viewer</strong> select karo. Download allowed rakho aur <strong>Copy link</strong> dabao. File ka link copy karo.</li>
+<li>Telegram bot ki private chat mein <strong>teen alag messages</strong> bhejo. Har message mein neeche ke example URL ki jagah us creator ka actual Drive link paste karo.</li>
+</ol>
+<div class="command"><div class="command-bar"><span>Telegram · sample message</span><button type="button">Copy</button></div><pre><code>/clip https://drive.google.com/file/d/YOUR_FILE_ID/view</code></pre></div>
+<p>Har link par bot ko <strong>8:45 AM and 4:45 PM IST slots</strong> wala queued reply dena chahiye. Phir status check karo:</p>
+<div class="command"><div class="command-bar"><span>Telegram</span><button type="button">Copy</button></div><pre><code>/status</code></pre></div>
+<p>Teen jobs <code>scheduled</code> dikhni chahiye. Bot link aur next timestamp save karta hai. Har slot mein teen alag sources se ek-ek 45-second clip ka target hai. Usable segment na mile toh kuch clips skip ho sakti hain. Run slot ke time start hota hai. Render aur uploads uske baad complete hote hain.</p>
+<p class="note">Mac band ho sakta hai jab files Drive par upload ho chuki hon aur bot ne unhe scheduled queue mein confirm kar diya ho. Drive route ko YouTube source cookies ki zaroorat nahi hoti.</p>
+</section>
+
+<section id="verify">
+<h2>4. Upload aur poori video khatam hone tak verify karo</h2>
+<ol>
+<li><strong>Pehla scheduled slot:</strong> Bot ke messages mein teen jobs dekho. Har successful job ke output mein source time range aur YouTube aur Instagram ka result hoga.</li>
+<li><strong>Links check karo:</strong> YouTube Short aur Instagram Reel dono ke links open karo. Kisi ek ke liye <code>not verified</code> aaye toh us platform ka upload confirm nahi hai.</li>
+<li><strong>Agla slot:</strong> Wahi Drive link apni saved position se resume karega. <code>/status</code> mein <code>Progress: … of …</code> dekho. <code>scheduled</code> ka matlab source ke aur segments baaki hain.</li>
+<li><strong>Video ka end:</strong> Jab bot <strong>Send a new /clip link</strong> kahe, us creator ka replacement link bhejo. Baaki creators ki links dobara bhejne ki zaroorat nahi.</li>
+</ol>
+<p>5-minute source mein maximum <strong>6 poori 45-second windows</strong> hain. Har slot mein ek eligible window publish ho toh us source ko lagbhag 3 din lag sakte hain. Quality check segments skip kar sakta hai. End mein 45 seconds se chhota hissa bach sakta hai.</p>
+<p class="warn"><strong>Immediate upload:</strong> <code>/now &lt;Drive link&gt;</code> worker free hote hi ek actual upload job banata hai. Daily scheduling ke liye <code>/clip</code> use karo.</p>
+</section>
+
+<section id="problems">
+<h2>Common problems aur fixes</h2>
+<table><thead><tr><th scope="col">Kya dikha</th><th scope="col">Kya karo</th></tr></thead><tbody>
+<tr><td><code>Permission denied (publickey,password)</code></td><td>VPS password check karke command dobara chalao. Password ya API key chat mein paste mat karo.</td></tr>
+<tr><td>Terminal kuch der blank</td><td>Download aur rendering mein output ke beech gap ho sakta hai. Terminal khuli rakho aur same command doosri baar start mat karo. <code>Waiting</code> ya lock ka message aaye toh active run finish hone do.</td></tr>
+<tr><td><code>Missing:</code> ya <code>no unused downloadable source found</code></td><td>Us creator ka cut verify nahi hua. Aakhri download error dekho. Agar cookie error hai toh neeche refresh karo. Agar fresh source nahi mila, authorized alternate recording Drive par use karo.</td></tr>
+<tr><td>Bot <code>/status</code> ka reply nahi deta</td><td>Private bot chat aur service status check karo. Neeche wala read-only Mac Terminal command use karo. Agar service missing hai, pehle Drive intake installer aur Drive API key chahiye.</td></tr>
+<tr><td>Drive <code>HTTP 403</code> ya <code>404</code></td><td>Check karo link ek video file ka hai, link access aur download allowed hain, aur API key ke Cloud project mein Google Drive API enabled hai. Pehle status check karo. Active ya held duplicate job ke liye wahi link dobara bhejna naya scheduled job nahi banayega.</td></tr>
+<tr><td><code>queued</code> / <code>scheduled</code> / <code>processing</code></td><td><code>queued</code> immediate job ka wait ho sakta hai. <code>scheduled</code> next eligible slot ka wait ya active series hai. <code>processing</code> aaye toh finish hone do.</td></tr>
+<tr><td><code>held</code> ya ek platform <code>not verified</code></td><td>Bot ka existing job status aur jo post link mila hai, pehle check karo. Same file ko <code>/now</code> se re-send karne se already published clip duplicate ho sakti hai. Held job ki automatic retry command is version mein available nahi hai.</td></tr>
+<tr><td>Video bahut badi ya disk space kam</td><td>Intake limit 20 GB tak hai, available space ke hisaab se kam ho sakti hai. Chhoti source file use karo.</td></tr>
+</tbody></table>
+<h3>Telegram service ka read-only check</h3>
+<div class="command"><div class="command-bar"><span>Mac Terminal</span><button type="button">Copy</button></div><pre><code>ssh "$CLIPS_SSH_HOST" 'systemctl is-active clip-telegram-drive.service; journalctl -u clip-telegram-drive.service -n 20 --no-pager'</code></pre></div>
+<h3>Telegram–Drive service pehle se install nahi ho toh</h3>
+<p>Google Cloud mein <strong>Drivepool → Google Drive API → Credentials</strong> par Drive API-restricted key ready rakho. Installer hidden prompt mein key lega. Pehle bot mein <code>/status</code> reply verify karo, phir step 2 ka scheduled update install karo.</p>
+<div class="command"><div class="command-bar"><span>Mac Terminal · initial install only</span><button type="button">Copy</button></div><pre><code>bash "tools/install-telegram-drive.sh"</code></pre></div>
+</section>
+
+<section id="cookies">
+<h2>YouTube cookies reject ho jaayein toh</h2>
+<p>Ye recovery YouTube-source downloads aur Desktop cuts ke liye hai. Drive link route independently chal sakta hai.</p>
+<ol>
+<li>Chrome Incognito mein YouTube sign in karo. Usi tab mein <code>https://www.youtube.com/robots.txt</code> kholo.</li>
+<li>Cookie extension se <strong>current site</strong> ka Netscape export lo. Nayi file <code>Downloads/youtube-cookies.txt</code> naam se save karo, phir Incognito close karo. Cookie file secret rakho.</li>
+<li>Sirf source access refresh karna ho toh ye command chalao:</li>
+</ol>
+<div class="command"><div class="command-bar"><span>Mac Terminal · refresh only</span><button type="button">Copy</button></div><pre><code>bash "tools/clip-cookie-refresh.sh" refresh</code></pre></div>
+<p><code>Cookies refreshed. No clip run started.</code> aaye toh Desktop cuts command phir chala sakte ho. Aaj ka missed slot bhi publish karna ho toh <strong>sirf ek</strong> retry command use karo:</p>
+<div class="command"><div class="command-bar"><span>Mac Terminal · morning retry</span><button type="button">Copy</button></div><pre><code>bash "tools/clip-cookie-refresh.sh" morning</code></pre></div>
+<div class="command"><div class="command-bar"><span>Mac Terminal · evening retry</span><button type="button">Copy</button></div><pre><code>bash "tools/clip-cookie-refresh.sh" evening</code></pre></div>
+<p><code>No test passed</code> aaye toh existing cookies replace nahi hui aur retry start nahi hui. <code>addOnDisposeCallback</code> ya <code>No video formats found</code> ke saath solver warnings aayein toh downloader version bhi check karo. Us situation mein cookie export akela fix confirm nahi karta.</p>
+</section>
+<footer>Offline guide. Commands cloned repo ke root se chalao. CLIPS_SSH_HOST ko apne VPS par set karo. Telegram status aur platform links se live result confirm karo.</footer>
+</main>
+<script>
+document.querySelectorAll('.command button').forEach((button) => {
+  const command = button.closest('.command').querySelector('code');
+  button.addEventListener('click', async () => {
+    try {
+      if (!navigator.clipboard) throw new Error('Clipboard unavailable');
+      await navigator.clipboard.writeText(command.textContent);
+      button.textContent = 'Copied';
+    } catch {
+      const range = document.createRange();
+      range.selectNodeContents(command);
+      const selection = window.getSelection();
+      selection.removeAllRanges();
+      selection.addRange(range);
+      button.textContent = document.execCommand('copy') ? 'Copied' : 'Press ⌘C';
+    }
+    window.setTimeout(() => { button.textContent = 'Copy'; }, 2300);
+  });
+});
+</script>
+</body>
+</html>

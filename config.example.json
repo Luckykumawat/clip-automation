@@ -10,5 +10,9 @@
   "meta_graph_version": "v27.0",
   "instagram_provider": "buffer",
   "instagram_handle": "@YOUR_INSTAGRAM_HANDLE",
-  "one_clip_per_creator": true
+  "one_clip_per_creator": true,
+  "content_aware_clips": false,
+  "instagram_only": false,
+  "youtube_video_urls": [],
+  "telegram_creator_selection": false
 }

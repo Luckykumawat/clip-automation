@@ -9,6 +9,7 @@ import re
 import subprocess
 import sys
 import tempfile
+import urllib.error
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -20,6 +21,18 @@ CONFIG = Path(os.environ.get("CLIPS_CONFIG", ROOT / "config.json"))
 DURATION = 45
 MIN_DURATION = 40
 INDIA = ZoneInfo("Asia/Kolkata")
+
+
+# VPS reliability update
+from publish import progress, telegram_message
+
+
+def ytdlp():
+    cookie = Path("/data/youtube-auth/youtube-cookies.txt")
+    args = ["yt-dlp"]
+    if cookie.is_file():
+        args.extend(["--cookies", str(cookie)])
+    return args
 
 
 def out(*args):
@@ -41,25 +54,72 @@ def write_json(path, value):
     temp.replace(path)
 
 
+# Continue after YouTube source errors
+def source_error(key, reason, notified):
+    progress(STATE, f"YouTube source {key}: {reason}")
+    if reason in notified:
+        return
+    notified.add(reason)
+    try:
+        secret = json.loads((STATE / "credentials.json").read_text())
+        telegram_message(secret["telegram_bot_token"], secret["telegram_chat_id"],
+                         f"YouTube source failed: {key} | {reason}. Trying remaining sources.")
+    except (OSError, RuntimeError, ValueError, KeyError) as error:
+        progress(STATE, f"Source alert failed: {type(error).__name__}")
+
+
 def candidates(config):
     inbox = RECORDINGS
-    recordings = () if config.get("one_clip_per_creator") else inbox.iterdir()
+    # Instagram-only publishing
+    local_only = config.get("instagram_only", False)
+    recordings = inbox.iterdir() if local_only or not config.get("one_clip_per_creator") else ()
     for path in sorted(recordings, key=lambda p: p.stat().st_mtime, reverse=True):
         if path.suffix.lower() not in {".mp4", ".mkv", ".mov", ".webm"}:
             continue
         with path.open("rb") as source:
             key = "local-" + hashlib.sha256(source.read(1024 * 1024)).hexdigest()[:24]
-        yield "local", (key, path, duration(path), path.stem, None)
+        yield key if local_only else "local", (key, path, duration(path), path.stem, None)
+    if local_only:
+        return
     channels = config.get("channel_streams_urls")
     if channels is None:
         channels = [config["channel_streams_url"]] if config.get("channel_streams_url") else []
     seen = set()
+    notified_sources = set()
+    for url in dict.fromkeys(config.get("youtube_video_urls", [])):
+        match = re.fullmatch(r"https://(?:www\.)?youtube\.com/watch\?v=([A-Za-z0-9_-]{11})", url)
+        if not match:
+            raise ValueError("Expected a YouTube watch URL in youtube_video_urls")
+        key = match.group(1)
+        if next((STATE / "queue").glob(f"{key}-*.json"), None):
+            continue
+        try:
+            video = json.loads(out(*ytdlp(), "--no-cache-dir", "--js-runtimes", "node",
+                                   "--no-playlist", "--skip-download", "--dump-single-json", url))
+        except (subprocess.CalledProcessError, ValueError):
+            source_error(key, "video lookup failed", notified_sources)
+            continue
+        length = video.get("duration")
+        if (video.get("live_status") in ("is_live", "is_upcoming")
+                or not isinstance(length, (int, float)) or length < DURATION):
+            continue
+        group = url
+        selection = config.get("selected_creator_channels")
+        if selection is not None:
+            uploader = (video.get("uploader_id") or "").casefold()
+            group = next((channel for channel in selection
+                          if channel.split("/")[3].casefold() == uploader), None)
+            if group is None:
+                continue
+        seen.add(key)
+        yield group, (key, None, length, video.get("title") or "YouTube video", url)
+
     for channel in dict.fromkeys(channels):
         pattern = r"https://(?:www\.)?youtube\.com/@[\w.-]+/streams/?"
         if not re.fullmatch(pattern, channel):
             raise ValueError("Expected a YouTube /@handle/streams URL")
         try:
-            listing = out("yt-dlp", "--no-cache-dir", "--flat-playlist", "--playlist-end", "5",
+            listing = out(*ytdlp(), "--no-cache-dir", "--flat-playlist", "--playlist-end", "5",
                           "--dump-single-json", channel)
             entries = json.loads(listing).get("entries", [])
         except (subprocess.CalledProcessError, ValueError):
@@ -141,15 +201,18 @@ def select_clips(config, date, test_path, target_count, slot, scratch, used_crea
                if test_path else candidates(config))
     count = len(config.get("channel_streams_urls") or [None])
     samples_per_channel = max(2, 6 // count)
+    direct_sources = set(config.get("youtube_video_urls", []))
+    metadata_key = config.get("gemini_api_key")
     ranked = []
     sampled = set()
+    notified_downloads = set()
     for group, (key, path, length, title, url) in sources:
         if group in sampled or group in used_creators:
             continue
         starts = available_starts(key, length)
         if not starts:
             continue
-        if path is None and len(starts) > samples_per_channel:
+        if (path is None or config.get("instagram_only")) and len(starts) > samples_per_channel:
             starts = [starts[round((len(starts) - 1) * i / (samples_per_channel + 1))]
                       for i in range(1, samples_per_channel + 1)]
         before = len(ranked)
@@ -158,30 +221,49 @@ def select_clips(config, date, test_path, target_count, slot, scratch, used_crea
             try:
                 if sample is None:
                     sample = scratch / f"{key}-{start}.mkv"
+                    progress(STATE, f"Downloading {key} at {start}s")
                     subprocess.run(
-                        ["yt-dlp", "--no-cache-dir", "--js-runtimes", "node", "--no-playlist",
+                        [*ytdlp(), "--no-cache-dir", "--js-runtimes", "node", "--no-playlist",
                          "--quiet", "--download-sections", f"*{start}-{start + DURATION + 2}",
                          "-f", "bv[ext=mp4][height<=720][protocol=https]+ba[ext=m4a][protocol=https]/bv*[height<=1080]+ba/b[height<=1080]", "--merge-output-format",
                          "mkv", "-o", str(sample), url],
-                        check=True, timeout=300, stderr=subprocess.DEVNULL)
+                        check=True, timeout=300, stderr=subprocess.PIPE)
                     clip_start = 0
                 if duration(sample) - clip_start >= MIN_DURATION:
-                    ranked.append((activity(sample, clip_start), group, key, start,
-                                   sample, clip_start, title, url))
-            except (subprocess.CalledProcessError, subprocess.TimeoutExpired, ValueError):
-                print(f"Skipping unavailable source window {key} at {start}s", file=sys.stderr)
+                    metadata = None
+                    score = activity(sample, clip_start)
+                    if metadata_key:
+                        from clip_metadata import analyze
+                        try:
+                            analysis = analyze(sample, clip_start, DURATION, metadata_key)
+                        except (urllib.error.URLError, TimeoutError, KeyError, IndexError,
+                                TypeError, ValueError) as error:
+                            raise RuntimeError(f"Clip analysis failed: {type(error).__name__}") from None
+                        if analysis is None:
+                            continue
+                        score, metadata = analysis
+                    ranked.append(((url in direct_sources, score), group, key, start,
+                                   sample, clip_start, title, url, metadata))
+            except (subprocess.CalledProcessError, subprocess.TimeoutExpired, ValueError) as error:
+                detail = getattr(error, "stderr", b"") or b""
+                if b"confirm you" in detail.lower() and b"bot" in detail.lower():
+                    source_error(key, "YouTube rejected the saved session", notified_downloads)
+                    break
+                if path is None and isinstance(error, (subprocess.CalledProcessError, subprocess.TimeoutExpired)):
+                    source_error(key, "segment download failed", notified_downloads)
+                progress(STATE, f"Source skipped: {key} at {start}s ({type(error).__name__})")
         if len(ranked) > before:
             sampled.add(group)
     selected = []
     chosen_creators = set()
     one_each = config.get("one_clip_per_creator") and not test_path
-    for _, group, key, start, sample, clip_start, title, url in sorted(ranked, reverse=True):
+    for _, group, key, start, sample, clip_start, title, url, metadata in sorted(ranked, reverse=True):
         if one_each and group in chosen_creators:
             continue
         if any(key == old_key and abs(start - old_start) < DURATION
                for _, old_key, old_start, *_ in selected):
             continue
-        selected.append((group, key, start, sample, clip_start, title, url))
+        selected.append((group, key, start, sample, clip_start, title, url, metadata))
         chosen_creators.add(group)
         if len(selected) == target_count:
             break
@@ -190,9 +272,10 @@ def select_clips(config, date, test_path, target_count, slot, scratch, used_crea
     queue.mkdir(exist_ok=True)
     exports = queue if test_path else EXPORTS
     exports.mkdir(exist_ok=True)
-    for group, key, start, sample, clip_start, title, url in sorted(selected):
+    for group, key, start, sample, clip_start, title, url, metadata in sorted(selected):
         identifier = f"{key}-{start}"
         video = exports / f"{identifier}.mp4"
+        progress(STATE, f"Rendering {identifier}")
         render(sample, clip_start, video, config.get("ishowspeed_facecam", False) and not test_path)
         timestamp = str(dt.timedelta(seconds=start))
         item = dict(id=identifier, date=date, slot=slot, creator=group,
@@ -201,6 +284,10 @@ def select_clips(config, date, test_path, target_count, slot, scratch, used_crea
                     title=f"{title[:75]} | {timestamp}",
                     caption=f"Livestream highlight from {timestamp}. " + (f"Source: {url}" if url else "")
                     + "\n\n#Shorts #GamingClips", youtube_id=None, instagram_id=None)
+        if metadata:
+            item.update(metadata, source_url=url)
+            if url:
+                item["youtube_description"] += f"\n\nSource: {url}"
         write_json(queue / f"{identifier}.json", item)
         result.append(item)
     return result
@@ -217,6 +304,13 @@ def main():
     (STATE / "queue").mkdir(exist_ok=True)
     RECORDINGS.mkdir(parents=True, exist_ok=True)
     config = json.loads(CONFIG.read_text())
+    if config.get("content_aware_clips") and not args.instagram_draft:
+        secret_file = STATE / "credentials.json"
+        if not secret_file.is_file() or secret_file.stat().st_mode & 0o077:
+            raise RuntimeError("Clip analysis requires credentials.json with mode 600")
+        config["gemini_api_key"] = json.loads(secret_file.read_text()).get("gemini_api_key")
+        if not config["gemini_api_key"]:
+            raise RuntimeError("Set gemini_api_key in credentials.json before enabling clip analysis")
     now = dt.datetime.now(INDIA)
     date = now.date().isoformat()
     slot = args.slot or ("morning" if now.hour < 17 else "evening")
@@ -250,11 +344,37 @@ def main():
             return
         items = [json.loads(p.read_text()) for p in (STATE / "queue").glob("*.json")]
         current = [item for item in items if item["date"] == date and item.get("slot") == slot]
-        remaining = 3 - len(current)
+        selection_path = STATE / f"creator-selection-{date}-{slot}.json"
+        if config.get("telegram_creator_selection") and (not current or selection_path.exists()):
+            from publish import choose_creators
+            selection = choose_creators(config["channel_streams_urls"], STATE / "queue",
+                                        date, slot, write_json)
+            config = dict(config, channel_streams_urls=selection,
+                          selected_creator_channels=selection, one_clip_per_creator=True)
+            print(json.dumps({"slot": slot, "selected_creators": selection}))
+        remaining = len(config.get("selected_creator_channels", [None] * 3)) - len(current)
+        # Scheduled Telegram Drive rotation shares the existing worker lock and slot.
+        drive_results = {}
+        drive_worker = Path("/data/telegram-drive-worker.py")
+        if remaining > 0 and drive_worker.is_file() and config.get("auto_publish"):
+            publish_from = config.get("auto_publish_from")
+            if not publish_from or date >= publish_from:
+                import runpy
+                module = runpy.run_path(str(drive_worker))
+                drive_results = module["run_scheduled_slot"](sys.modules[__name__], date, slot, remaining)
+                if drive_results:
+                    remaining -= len(drive_results)
+                    print(json.dumps({"date": date, "slot": slot, "drive_results": drive_results}))
         if remaining > 0:
             used_creators = ({item.get("creator") for item in current}
                              if config.get("one_clip_per_creator") else ())
             current.extend(generate(config, date, None, remaining, slot, used_creators))
+        if not current and "complete" in drive_results.values():
+            return
+        if not current:
+            if config.get("instagram_only"):
+                raise RuntimeError("No usable footage in the VPS recordings inbox")
+            raise RuntimeError("No usable clips generated")
         verification = []
         publish_from = config.get("auto_publish_from")
         auto_publish = config.get("auto_publish", False) and (
@@ -263,15 +383,48 @@ def main():
         if auto_publish:
             for item in current:
                 item["path"] = str(EXPORTS / f'{item["id"]}.mp4')
+            progress(STATE, f"Publishing {len(current)} clip(s) for {slot}")
             from publish import publish_pending, verify_publications
             try:
-                publish_pending(current, STATE / "queue", config, write_json, date)
+                publishable = [
+                    item for item in current
+                    if not config.get("content_aware_clips") or item.get("observed_moment")
+                ]
+                if len(publishable) < len(current):
+                    print("Held previously queued clips with generic metadata", file=sys.stderr)
+                publish_pending(publishable, STATE / "queue", config, write_json, date)
             finally:
                 verification = verify_publications(current, STATE / "queue", config, write_json)
                 print(json.dumps({"date": date, "slot": slot, "verified": verification}))
+            if config.get("instagram_provider") == "buffer":
+                require_youtube = not config.get("instagram_only") and config.get("youtube_privacy") == "public"
+                if any((require_youtube and not item.get("youtube_public_verified"))
+                       or item.get("buffer_post_status") != "sent"
+                       for item in verification) or not verification:
+                    raise RuntimeError("Publishing could not be verified on configured platforms")
+        progress(STATE, f"Finished {date} {slot}: {len(current)} clip(s)")
         print(json.dumps({"date": date, "slot": slot, "clips": [item["id"] for item in current],
                           "auto_publish": auto_publish}))
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as error:
+        if "--test" not in sys.argv and "--instagram-draft" not in sys.argv:
+            reason = str(error) if str(error) in {
+                "YouTube rejected the scheduled session", "No usable clips generated",
+                "Publishing could not be verified on configured platforms",
+                "No usable footage in the VPS recordings inbox",
+            } else type(error).__name__
+            run_time = dt.datetime.now(INDIA)
+            slot_index = sys.argv.index("--slot") + 1 if "--slot" in sys.argv else None
+            slot = sys.argv[slot_index] if slot_index is not None and slot_index < len(sys.argv) else "automatic"
+            message = f"Clip workflow failed | {run_time:%d %b %H:%M} IST | {slot} | {reason}"
+            try:
+                progress(STATE, message)
+                credentials = json.loads((STATE / "credentials.json").read_text())
+                telegram_message(credentials["telegram_bot_token"], credentials["telegram_chat_id"], message)
+            except Exception as alert_error:
+                print(f"Failure alert could not be sent: {type(alert_error).__name__}", file=sys.stderr)
+        raise
