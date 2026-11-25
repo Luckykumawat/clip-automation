@@ -71,7 +71,7 @@ footer{color:var(--muted);font-size:.9rem} @media print{button,nav{display:none}
 <li><strong>Video ka end:</strong> Jab bot <strong>Send a new /clip link</strong> kahe, us creator ka replacement link bhejo. Baaki creators ki links dobara bhejne ki zaroorat nahi.</li>
 </ol>
 <p>5-minute source mein maximum <strong>6 poori 45-second windows</strong> hain. Har slot mein ek eligible window publish ho toh us source ko lagbhag 3 din lag sakte hain. Quality check segments skip kar sakta hai. End mein 45 seconds se chhota hissa bach sakta hai.</p>
-<p class="warn"><strong>Immediate upload:</strong> <code>/now &lt;Drive link&gt;</code> worker free hote hi ek actual upload job banata hai. Daily scheduling ke liye <code>/clip</code> use karo.</p>
+<p class="warn"><strong>Scheduled upload:</strong> <code>/clip &lt;Drive link&gt;</code> se job schedule karo. Drive queue sirf 08:45 aur 16:45 IST par process hoti hai.</p>
 </section>
 
 <section id="problems">
@@ -83,7 +83,7 @@ footer{color:var(--muted);font-size:.9rem} @media print{button,nav{display:none}
 <tr><td>Bot <code>/status</code> ka reply nahi deta</td><td>Private bot chat aur service status check karo. Neeche wala read-only Mac Terminal command use karo. Agar service missing hai, pehle Drive intake installer aur Drive API key chahiye.</td></tr>
 <tr><td>Drive <code>HTTP 403</code> ya <code>404</code></td><td>Check karo link ek video file ka hai, link access aur download allowed hain, aur API key ke Cloud project mein Google Drive API enabled hai. Pehle status check karo. Active ya held duplicate job ke liye wahi link dobara bhejna naya scheduled job nahi banayega.</td></tr>
 <tr><td><code>queued</code> / <code>scheduled</code> / <code>processing</code></td><td><code>queued</code> immediate job ka wait ho sakta hai. <code>scheduled</code> next eligible slot ka wait ya active series hai. <code>processing</code> aaye toh finish hone do.</td></tr>
-<tr><td><code>held</code> ya ek platform <code>not verified</code></td><td>Bot ka existing job status aur jo post link mila hai, pehle check karo. Same file ko <code>/now</code> se re-send karne se already published clip duplicate ho sakti hai. Held job ki automatic retry command is version mein available nahi hai.</td></tr>
+<tr><td><code>held</code> ya ek platform <code>not verified</code></td><td>Bot ka existing job status aur jo post link mila hai, pehle check karo. Held job ki automatic retry command is version mein available nahi hai.</td></tr>
 <tr><td>Video bahut badi ya disk space kam</td><td>Intake limit 20 GB tak hai, available space ke hisaab se kam ho sakti hai. Chhoti source file use karo.</td></tr>
 </tbody></table>
 <h3>Telegram service ka read-only check</h3>

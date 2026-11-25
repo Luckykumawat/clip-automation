@@ -23,7 +23,7 @@ docker compose exec -T --user 0:0 clips sh -ec '
 docker compose exec -T clips python3 -c '
 import clips, runpy
 assert "run_scheduled_slot" in open(clips.__file__).read()
-assert callable(runpy.run_path("/data/telegram-drive-worker.py")["run_scheduled_slot"])
+assert callable(runpy.run_path("/data/telegram-drive-worker.py")["drive_slot_open"])
 ' </dev/null
 systemctl restart clip-telegram-drive.service
 systemctl is-active clip-telegram-drive.service

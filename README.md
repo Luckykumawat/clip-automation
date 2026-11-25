@@ -134,7 +134,7 @@ Submit each downloadable Drive file with `/clip <Drive file link>`. The next
 one clip per source. Each source saves its next timestamp and continues in
 subsequent slots until less than 45 seconds of usable footage remains.
 The bot reports progress, platform links, and when a new source is needed.
-Use `/now <Drive file link>` for an immediate one-off publishing request.
+Drive jobs run only during the scheduled minute. Submit new links with `/clip`.
 
 Use footage you have permission to repost. With API-key access the Drive
 file must be downloadable by anyone with its link. Intake is capped at
